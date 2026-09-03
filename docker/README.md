@@ -79,6 +79,27 @@ bundle and grepping it finds the string, and the browser shows the heading.
 docker rm -f node-hello py-hello java-hello apache-hello react-hello nginx-hello
 ```
 
+## Screenshots
+
+Captured with playwright against each running container, so these are the pages as a real
+browser renders them.
+
+| Node.js - http://localhost:3000 | Python - http://localhost:5050 |
+|---|---|
+| ![node](shots/nodejs.png) | ![python](shots/python.png) |
+
+| Java - http://localhost:8200 | Apache - http://localhost:8300 |
+|---|---|
+| ![java](shots/java.png) | ![apache](shots/apache.png) |
+
+| React - http://localhost:8400 | Nginx - http://localhost:8500 |
+|---|---|
+| ![react](shots/react.png) | ![nginx](shots/nginx.png) |
+
+The React one is the reason a screenshot was worth taking at all. `curl` on that port only returns
+`<div id="root"></div>` and a script tag, because the heading is rendered client side. The browser
+runs the bundle and the text appears, button and all.
+
 ## Output
 
 ```console
