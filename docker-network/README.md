@@ -162,6 +162,28 @@ mid-heading. The file changed size under nginx and the response went out with a 
 Content-Length. The next request returned all 158 bytes fine. Harmless here, but it's the kind of
 thing that makes people think a bind mount "didn't update" when it actually did.
 
+### Screenshots
+
+http://localhost:9200 before the edit:
+
+![before the edit](shots/bind-before.png)
+
+and after editing `site/index.html` on the host, same container, no restart:
+
+![after the edit](shots/bind-after.png)
+
+Taken with playwright driving a real browser. To make the second one honest I put the file back to
+plain `Hello students`, took the first shot, rewrote the file, then reloaded the same page - the
+container was never touched:
+
+```
+$ docker inspect -f '{{.State.StartedAt}}  restarts={{.RestartCount}}' bind-nginx
+2026-09-03T17:33:54.752100841Z  restarts=0     <- before
+2026-09-03T17:33:54.752100841Z  restarts=0     <- after
+```
+
+Same start timestamp, zero restarts, different page.
+
 Mounted with `:ro`, so the container can't write back:
 
 ```
@@ -173,6 +195,14 @@ Bind mount vs named volume, since they're easy to confuse: a bind mount points a
 on the host and you manage it, which is great for dev and for config files. A named volume is
 managed by Docker under `/var/lib/docker/volumes`, is portable between hosts, and is what you'd
 actually use for database data.
+
+### Why there are no screenshots for tasks 1 and 2
+
+Task 1 is all terminal work - ping, nslookup, nc between containers - so there is no page to
+photograph and the command output above is the evidence. Task 2's apache is on the host network
+inside the Docker Desktop VM, which macOS `localhost` cannot reach, so a browser on my Mac has
+nothing to load there either. That one is verified with `wget` from inside the same network
+namespace instead.
 
 ## Task 4 - overlay networks
 
