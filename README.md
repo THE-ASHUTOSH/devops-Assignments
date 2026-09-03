@@ -14,9 +14,9 @@ ip/ss, systemctl) I ran it in a container, since I'm on a Mac.
 | 2 | [shell/](shell/) | `info.sh` - system info script with read -p, mkdir, touch and output redirection |
 | 3 | [networking/](networking/) | ip, routing, ping, traceroute, dig, curl, ss, tcpdump, nmap and what each showed |
 | 4 | [git/](git/) | `commit -m` vs `commit -a -m`, and a cherry-pick between branches |
-| 5 | [docker/](docker/) | six Hello World web apps - node, python, java, apache, react, nginx |
-| 6 | [multistage/](multistage/) | multi-stage build on port 8080, 471MB down to 20.6MB |
-| 7 | [docker-network/](docker-network/) | 3 containers across 3 networks, host network, bind mount, overlay notes |
+| 5 | [docker/](docker/) | six Hello World web apps - node, python, java, apache, react, nginx (+ screenshots) |
+| 6 | [multistage/](multistage/) | multi-stage build on port 8080, 471MB down to 20.6MB (+ screenshot) |
+| 7 | [docker-network/](docker-network/) | 3 containers across 3 networks, host network, bind mount (+ screenshots), overlay notes |
 
 ## Layout
 
@@ -52,6 +52,9 @@ ip/ss, systemctl) I ran it in a container, since I'm on a Mac.
   that in - it demonstrates what host mode actually does better than a clean run would.
 - Ports on the left of `-p` are shifted off the defaults in a few places because 80, 5000 and
   8081-8091 were already taken on my machine.
+- Screenshots were taken with playwright against the live containers, for the tasks that ask to
+  see something in a browser. The rest of the tasks are terminal work, so those keep the actual
+  command output instead.
 
 ## Ran on
 
