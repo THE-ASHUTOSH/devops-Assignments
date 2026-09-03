@@ -105,6 +105,15 @@ docker run -d --name java-hello -p 8200:8080 hw-java-app
 Threw the Go one into the same table because the memory number makes the point again - 1.75 MiB
 against 33-52 MiB for the others.
 
+## Screenshot
+
+http://localhost:8080 in a real browser:
+
+![multi-stage app on port 8080](shots/app.png)
+
+The container id on the page (`3c81f4fbcc87`) is the same one `docker ps` reports below, so that
+really is the multi-stage container answering on 8080.
+
 ## Output
 
 ```console
@@ -156,7 +165,9 @@ $ docker port ms-hello
 $ curl -i http://localhost:8080
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   187  100   187    0     0    99k      0 --:--:-- --:--:-- --:--:--  182k
+
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100   187  100   187    0     0    99k      0 --:--:-- --:--:-- --:--:--  182k
 HTTP/1.1 200 OK
 Content-Type: text/html
 Date: Thu, 03 Sep 2026 17:25:58 GMT
