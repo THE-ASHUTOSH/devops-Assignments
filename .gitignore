@@ -1,0 +1,4 @@
+node_modules/
+dist/
+sysreport/
+.DS_Store
