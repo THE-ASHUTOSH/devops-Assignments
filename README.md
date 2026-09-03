@@ -10,36 +10,41 @@ ip/ss, systemctl) I ran it in a container, since I'm on a Mac.
 
 | # | section | what's in it |
 |---|---|---|
-| 1 | [linux/](linux/) | soft vs hard links, adduser vs useradd, journalctl, command cheat sheet |
-| 2 | [shell/](shell/) | `info.sh` - system info script with read -p, mkdir, touch and output redirection |
-| 3 | [networking/](networking/) | ip, routing, ping, traceroute, dig, curl, ss, tcpdump, nmap and what each showed |
-| 4 | [git/](git/) | `commit -m` vs `commit -a -m`, and a cherry-pick between branches |
-| 5 | [docker/](docker/) | six Hello World web apps - node, python, java, apache, react, nginx (+ screenshots) |
-| 6 | [multistage/](multistage/) | multi-stage build on port 8080, 471MB down to 20.6MB (+ screenshot) |
-| 7 | [docker-network/](docker-network/) | 3 containers across 3 networks, host network, bind mount (+ screenshots), overlay notes |
+| 1 | [Linux Fundamental](Linux%20Fundamental/) | soft vs hard links, adduser vs useradd, journalctl, command cheat sheet |
+| 2 | [Shell Scripting](Shell%20Scripting/) | `info.sh` - system info script with read -p, mkdir, touch and output redirection |
+| 3 | [Netwroking Fundamentals](Netwroking%20Fundamentals/) | ip, routing, ping, traceroute, dig, curl, ss, tcpdump, nmap and what each showed |
+| 4 | [Git-GitHub](Git-GitHub/) | `commit -m` vs `commit -a -m`, and a cherry-pick between branches |
+| 5 | [Docker Fundamental](Docker%20Fundamental/) | six Hello World web apps - node, python, java, apache, react, nginx (+ screenshots) |
+| 6 | [Dockerfiles & Images](Dockerfiles%20%26%20Images/) | multi-stage build on port 8080, 471MB down to 20.6MB (+ screenshot) |
+| 7 | [Docker Network](Docker%20Network/) | 3 containers across 3 networks, host network, bind mount (+ screenshots), overlay notes |
 
 ## Layout
 
 ```
-├── linux/
-├── shell/
+├── Linux Fundamental/
+├── Shell Scripting/
 │   └── info.sh
-├── networking/
-├── git/
-├── docker/
+├── Netwroking Fundamentals/
+├── Git-GitHub/
+├── Docker Fundamental/
 │   ├── nodejs-app/
 │   ├── python-app/
 │   ├── java-app/
 │   ├── Apache-app/
 │   ├── React-app/
 │   └── nginx-app/
-├── multistage/
+├── Dockerfiles & Images/
 │   ├── main.go
 │   ├── Dockerfile
 │   └── Dockerfile.single
-└── docker-network/
+└── Docker Network/
     └── site/
 ```
+
+Folder names are the section headings from the assignment doc, so they line up one-to-one with it.
+Two had to bend slightly: `Git/GitHub` became `Git-GitHub` because a folder name can't contain a
+slash, and `Netwroking Fundamentals` keeps the doc's spelling. The six app folders inside
+`Docker Fundamental/` are named exactly as the doc lists them.
 
 ## A few things worth calling out
 

@@ -144,23 +144,18 @@ docker run -d --name bind-nginx -p 9200:80 -v $(pwd)/site:/usr/share/nginx/html:
 
 ```
 $ docker inspect -f '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}} (rw={{.RW}}){{end}}' bind-nginx
-bind /Users/ashutosh/Documents/SST/devopsAssignment/docker-network/site -> /usr/share/nginx/html (rw=false)
+bind /Users/ashutosh/Documents/SST/devopsAssignment/Docker Network/site -> /usr/share/nginx/html (rw=false)
 ```
 
 Then I edited the file on the Mac with sed and re-fetched **without touching the container**.
 `docker ps` still says `Up 3 seconds` before and after, so it definitely wasn't restarted, and the
-page now reads `Hello students - edited live at 23:03:57`. `docker exec bind-nginx cat` on the file
+page now reads `Hello students - edited live at 23:29:11`. `docker exec bind-nginx cat` on the file
 inside the container shows the new text too.
 
 Dropping a completely new file in works the same way - `site/extra.html` appeared at
 http://localhost:9200/extra.html straight away, no rebuild, no restart. That's the whole appeal of
 a bind mount for local dev: the container is looking at your actual directory, not a copy baked
 into the image at build time.
-
-Small real-world detail: the very first curl right after the edit came back **truncated**
-mid-heading. The file changed size under nginx and the response went out with a stale
-Content-Length. The next request returned all 158 bytes fine. Harmless here, but it's the kind of
-thing that makes people think a bind mount "didn't update" when it actually did.
 
 ### Screenshots
 
@@ -178,8 +173,8 @@ container was never touched:
 
 ```
 $ docker inspect -f '{{.State.StartedAt}}  restarts={{.RestartCount}}' bind-nginx
-2026-09-03T17:33:54.752100841Z  restarts=0     <- before
-2026-09-03T17:33:54.752100841Z  restarts=0     <- after
+2026-09-03T17:59:08.435112583Z  restarts=0     <- before
+2026-09-03T17:59:08.435112583Z  restarts=0     <- after
 ```
 
 Same start timestamp, zero restarts, different page.
@@ -522,15 +517,18 @@ $ cat site/index.html
   </body>
 </html>
 
-$ docker run -d --name bind-nginx -p 9200:80 -v $(pwd)/site:/usr/share/nginx/html:ro nginx:alpine
-73258d4c01093d0b19dedd54b1fd81249837147ce49d16132ebda2e6f266354a
+$ docker run -d --name bind-nginx -p 9200:80 -v "$(pwd)/site:/usr/share/nginx/html:ro" nginx:alpine
+02932a882868aa31b5e9188e98403ba05b8127c78ecec050d63554ea86b58e08
 
 $ docker ps --filter name=bind-nginx
 NAMES        STATUS         PORTS
 bind-nginx   Up 3 seconds   0.0.0.0:9200->80/tcp, [::]:9200->80/tcp
 
 $ docker inspect -f '{{range .Mounts}}{{.Type}} {{.Source}} -> {{.Destination}} (rw={{.RW}}){{end}}' bind-nginx
-bind /Users/ashutosh/Documents/SST/devopsAssignment/docker-network/site -> /usr/share/nginx/html (rw=false)
+bind /Users/ashutosh/Documents/SST/devopsAssignment/Docker Network/site -> /usr/share/nginx/html (rw=false)
+
+$ docker inspect -f '{{.State.StartedAt}} restarts={{.RestartCount}}' bind-nginx
+2026-09-03T17:59:08.435112583Z restarts=0
 
 $ curl -s http://localhost:9200
 <!doctype html>
@@ -543,59 +541,8 @@ $ curl -s http://localhost:9200
   </body>
 </html>
 
---- now edit the file on my mac, container is NOT restarted ---
-$ docker ps --filter name=bind-nginx --format '{{.Status}}'   (before edit)
-Up 3 seconds
-
-$ sed -i '' 's|<h1>Hello students</h1>|<h1>Hello students - edited live at 23:03:57</h1>|' site/index.html
-$ cat site/index.html
-<!doctype html>
-<html>
-  <head>
-    <title>Bind mount demo</title>
-  </head>
-  <body>
-    <h1>Hello students - edited live at 23:03:57</h1>
-  </body>
-</html>
-
-$ curl -s http://localhost:9200
-<!doctype html>
-<html>
-  <head>
-    <title>Bind mount demo</title>
-  </head>
-  <body>
-    <h1>Hello students - edited live at 23:03:
-$ docker ps --filter name=bind-nginx --format '{{.Status}}'   (after edit - same container, never restarted)
-Up 3 seconds
-
-$ docker exec bind-nginx cat /usr/share/nginx/html/index.html
-<!doctype html>
-<html>
-  <head>
-    <title>Bind mount demo</title>
-  </head>
-  <body>
-    <h1>Hello students - edited live at 23:03:57</h1>
-  </body>
-</html>
-
---- add a second file on the host, it shows up straight away ---
-$ echo '<h1>a brand new page</h1>' > site/extra.html
-$ curl -s http://localhost:9200/extra.html
-<h1>a brand new page</h1>
-$ docker exec bind-nginx ls -l /usr/share/nginx/html
-total 8
--rw-r--r--    1 root     root            26 Sep  3 17:33 extra.html
--rw-r--r--    1 root     root           158 Sep  3 17:33 index.html
-
---- mounted :ro so the container cannot write back ---
-$ docker exec bind-nginx sh -c 'echo hacked > /usr/share/nginx/html/index.html'
-sh: can't create /usr/share/nginx/html/index.html: Read-only file system
-
---- the curl right after the edit came back cut short (stale Content-Length on a file
---- that changed size under nginx). fetching again gives the whole page: ---
+--- edit the file on the host, container is NOT restarted ---
+$ sed -i '' 's|<h1>Hello students</h1>|<h1>Hello students - edited live at 23:29:11</h1>|' site/index.html
 $ curl -s -w '
 [%{size_download} bytes, HTTP %{http_code}]
 ' http://localhost:9200
@@ -605,9 +552,36 @@ $ curl -s -w '
     <title>Bind mount demo</title>
   </head>
   <body>
-    <h1>Hello students - edited live at 23:03:57</h1>
+    <h1>Hello students - edited live at 23:29:11</h1>
   </body>
 </html>
 
 [158 bytes, HTTP 200]
+
+$ docker inspect -f '{{.State.StartedAt}} restarts={{.RestartCount}}' bind-nginx   (unchanged)
+2026-09-03T17:59:08.435112583Z restarts=0
+
+$ docker exec bind-nginx cat /usr/share/nginx/html/index.html
+<!doctype html>
+<html>
+  <head>
+    <title>Bind mount demo</title>
+  </head>
+  <body>
+    <h1>Hello students - edited live at 23:29:11</h1>
+  </body>
+</html>
+
+--- a brand new file on the host shows up straight away ---
+$ echo '<h1>a brand new page</h1>' > site/extra.html
+$ curl -s http://localhost:9200/extra.html
+<h1>a brand new page</h1>
+$ docker exec bind-nginx ls -l /usr/share/nginx/html
+total 8
+-rw-r--r--    1 root     root            26 Sep  3 17:59 extra.html
+-rw-r--r--    1 root     root           158 Sep  3 17:59 index.html
+
+--- mounted :ro so the container cannot write back ---
+$ docker exec bind-nginx sh -c 'echo hacked > /usr/share/nginx/html/index.html'
+sh: can't create /usr/share/nginx/html/index.html: Read-only file system
 ```

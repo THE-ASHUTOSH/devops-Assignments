@@ -87,7 +87,7 @@ Also added `USER appuser` so it doesn't run as root - `id` inside the container 
 
 ## Task 3 - three different application types deployed
 
-Node.js, Python and Java, all running at the same time. Source is in `../docker/`.
+Node.js, Python and Java, all running at the same time. Source is in `../Docker Fundamental/`.
 
 ```bash
 docker run -d --name node-hello -p 3000:3000 hw-nodejs-app
