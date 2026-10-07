@@ -1,0 +1,14 @@
+# gitleaks config - the secret scanner reads this
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API key"
+regex = '''(?i)(api[_-]?key|apikey)['"]?\s*[:=]\s*['"][0-9a-zA-Z\-_]{16,}['"]'''
+
+[allowlist]
+description = "Session 12 deliberately shows a fake secret for teaching"
+paths = [
+  '''Session 12 - Ingress, ConfigMaps & Secrets/secret/secret.yml''',
+]
