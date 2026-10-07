@@ -5,6 +5,7 @@ COPY application/package.json ./
 RUN npm install --omit=dev
 
 FROM node:20-alpine
+RUN apk --no-cache upgrade
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY application/src ./src

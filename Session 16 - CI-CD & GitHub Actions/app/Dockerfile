@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# pull in patched OS packages (trivy flagged HIGH openssl CVEs in the base image)
+RUN apk --no-cache upgrade
+
 WORKDIR /app
 
 # copy package.json first so this layer caches when only source changes
