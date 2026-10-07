@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-db
+spec:
+  type: ExternalName          # just a DNS CNAME, no pods, no IP
+  externalName: example.com
