@@ -1,0 +1,25 @@
+# Argo CD Application - this is the GitOps object.
+# It says "make the cluster match this git path", forever.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/THE-ASHUTOSH/devops-Assignments.git
+    targetRevision: main
+    path: Session 17 - DevSecOps/kubernetes
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: demo
+
+  syncPolicy:
+    automated:
+      prune: true      # delete things removed from git
+      selfHeal: true   # undo manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
