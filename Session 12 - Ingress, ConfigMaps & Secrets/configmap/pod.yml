@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: busybox:1.36
+      command: ["sh", "-c", "echo '--- env vars ---'; env | grep -E 'APP_|LOG_'; echo '--- mounted file ---'; cat /config/app.properties; sleep 3600"]
+      env:
+        # one value at a time
+        - name: APP_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_NAME
+      envFrom:
+        # or pull in everything at once
+        - configMapRef:
+            name: app-config
+      volumeMounts:
+        - name: config-volume
+          mountPath: /config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: app-config

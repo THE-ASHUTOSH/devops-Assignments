@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken-app
+  template:
+    metadata:
+      labels:
+        app: broken-app
+    spec:
+      containers:
+        - name: app
+          image: hashicorp/http-echo:1.0
+          args: ["-text=broken app works now", "-listen=:8080"]
+          env:
+            - name: MISSING
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: APP_NAME      # FIX 1: a key that exists
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-svc
+spec:
+  selector:
+    app: broken-app     # FIX 2: matches the pod label
+  ports:
+    - port: 80
+      targetPort: 8080  # FIX 3: the port the pods actually listen on

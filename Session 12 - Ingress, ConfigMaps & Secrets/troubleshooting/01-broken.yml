@@ -1,0 +1,37 @@
+# Three things are wrong in here on purpose.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: broken-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: broken-app
+  template:
+    metadata:
+      labels:
+        app: broken-app
+    spec:
+      containers:
+        - name: app
+          image: hashicorp/http-echo:1.0
+          args: ["-text=broken app works now", "-listen=:8080"]
+          env:
+            # BUG 1: this key does not exist in the configmap
+            - name: MISSING
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DOES_NOT_EXIST
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broken-svc
+spec:
+  selector:
+    app: brokenapp      # BUG 2: missing the dash, does not match the pod label
+  ports:
+    - port: 80
+      targetPort: 9999  # BUG 3: pods listen on 8080, not 9999

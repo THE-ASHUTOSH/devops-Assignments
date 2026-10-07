@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+data:
+  APP_NAME: "my-demo-app"
+  APP_ENV: "development"
+  LOG_LEVEL: "debug"
+  # a whole file can live in a configmap too
+  app.properties: |
+    server.port=8080
+    server.timeout=30
