@@ -1,10 +1,10 @@
-# Session 12 - Kubernetes Ingress, ConfigMaps & Secrets
+# Session 12 - Ingress, ConfigMaps & Secrets
 
-**Ashutosh Kumar** · **24bcs10111**
+Ashutosh Kumar - 24bcs10111
 
 ## Task 1 - ConfigMap
 
-[`configmap/configmap.yml`](configmap/configmap.yml) holds three plain values and one whole file:
+[`configmap/configmap.yml`](configmap/configmap.yml) has three plain values and one whole file:
 
 ```yaml
 data:
@@ -16,58 +16,24 @@ data:
     server.timeout=30
 ```
 
-```bash
-kubectl apply -f configmap/
-kubectl describe configmap app-config
-```
-
-```
-Name:         app-config
-Namespace:    default
-
-Data
-====
-APP_ENV:
-----
-development
-APP_NAME:
-----
-my-demo-app
-LOG_LEVEL:
-----
-debug
-app.properties:
-----
-server.port=8080
-server.timeout=30
-```
-
-### Injecting it into a pod
-
-[`configmap/pod.yml`](configmap/pod.yml) uses all three ways at once:
+[`configmap/pod.yml`](configmap/pod.yml) uses all three ways of getting it in:
 
 ```yaml
 env:
-  - name: APP_NAME               # 1. one specific key
+  - name: APP_NAME               # 1. one key
     valueFrom:
-      configMapKeyRef:
-        name: app-config
-        key: APP_NAME
+      configMapKeyRef: { name: app-config, key: APP_NAME }
 envFrom:
-  - configMapRef:                # 2. every key as an env var
-      name: app-config
+  - configMapRef: { name: app-config }    # 2. every key as env vars
 volumeMounts:
-  - name: config-volume          # 3. as files on disk
+  - name: config-volume                    # 3. as files
     mountPath: /config
 ```
 
-### Verified inside the container
-
-```bash
-kubectl logs configmap-demo
-```
+Inside the container:
 
 ```
+$ kubectl logs configmap-demo
 --- env vars ---
 LOG_LEVEL=debug
 APP_NAME=my-demo-app
@@ -77,19 +43,9 @@ server.port=8080
 server.timeout=30
 ```
 
-All three keys arrived as env vars from `envFrom`, and `app.properties` became a real file at
-`/config/app.properties`.
+### What happens on an update
 
-### The interesting bit - what happens on an update
-
-I changed the ConfigMap while the pod was running:
-
-```bash
-kubectl patch configmap app-config --type merge \
-  -p '{"data":{"app.properties":"server.port=9090\nserver.timeout=60\n","LOG_LEVEL":"info"}}'
-```
-
-Waited ~75 seconds, then checked both:
+I changed the ConfigMap while the pod was running, waited 75 seconds, then checked both:
 
 ```
 $ kubectl exec configmap-demo -- cat /config/app.properties
@@ -100,33 +56,25 @@ $ kubectl exec configmap-demo -- sh -c 'echo LOG_LEVEL=$LOG_LEVEL'
 LOG_LEVEL=debug
 ```
 
-**The mounted file updated. The env var did not.**
+**The file updated. The env var did not.**
 
-That's a genuinely important difference I didn't expect. Env vars are set once when the container
-starts and can never change - the only way to pick up a new value is to restart the pod. Mounted
-files get re-synced by the kubelet (roughly every minute).
+I did not expect that. Env vars are set once when the container starts and can never change. Files
+get re-synced by the kubelet about every minute.
 
-So if you want config reloads without a restart, mount it as a volume *and* have the app watch the
-file. Otherwise you need:
-
-```bash
-kubectl rollout restart deployment/<name>
-```
+So if you want config reloads without a restart, mount it as a volume. Otherwise you need
+`kubectl rollout restart deployment/<name>`.
 
 ## Task 2 - Secret
 
-[`secret/secret.yml`](secret/secret.yml). I used `stringData` so I could write plain text and let
-Kubernetes do the base64:
+[`secret/secret.yml`](secret/secret.yml) uses `stringData` so I write plain text and Kubernetes
+does the base64:
 
 ```yaml
-type: Opaque
 stringData:
   DB_USER: "admin"
   DB_PASSWORD: "sup3rs3cret"
   API_KEY: "ak_live_12345"
 ```
-
-### Injected the same two ways
 
 ```
 $ kubectl logs secret-demo
@@ -136,9 +84,7 @@ DB_USER=admin
 sup3rs3cret
 ```
 
-### Why Secrets must not be committed to Git
-
-This is the part the task asks to understand, and it's easy to show.
+### Why Secrets must not go in Git
 
 `kubectl get` hides the values:
 
@@ -147,17 +93,15 @@ NAME         TYPE     DATA   AGE
 app-secret   Opaque   3      0s
 ```
 
-`describe` also hides them - it only gives sizes:
+`describe` also hides them, it only shows sizes:
 
 ```
-Data
-====
 API_KEY:      13 bytes
 DB_PASSWORD:  11 bytes
 DB_USER:      5 bytes
 ```
 
-That makes it *feel* protected. It isn't:
+That makes it feel protected. It is not:
 
 ```
 $ kubectl get secret app-secret -o jsonpath='{.data.DB_PASSWORD}'
@@ -167,52 +111,43 @@ $ kubectl get secret app-secret -o jsonpath='{.data.DB_PASSWORD}' | base64 -d
 sup3rs3cret
 ```
 
-**base64 is encoding, not encryption.** There's no key and no password - anyone with the file can
-reverse it in one command. A secret YAML in a Git repo is a plaintext password in a Git repo, and
-git history keeps it forever even after you "remove" it.
+base64 is encoding, not encryption. No key, no password, anyone with the file can reverse it in one
+command. A Secret YAML in Git is a plaintext password in Git, and git history keeps it forever even
+after you remove it.
 
 What to do instead:
 
-- never commit the Secret manifest - keep it out with `.gitignore`
-- Sealed Secrets or SOPS, which commit an *encrypted* file that only the cluster can decrypt
-- an external store - AWS Secrets Manager, Vault - pulled in by the External Secrets Operator
-- enable **encryption at rest** in etcd, because by default secrets are stored unencrypted there too
-- RBAC, since anyone who can `get secrets` in a namespace can read all of them
+- gitignore the Secret file
+- Sealed Secrets or SOPS, which commit an encrypted file only the cluster can decrypt
+- an external store like AWS Secrets Manager or Vault
+- turn on encryption at rest, because secrets are stored unencrypted in etcd by default
+- RBAC, since anyone who can `get secrets` can read all of them
 
-This is also exactly why Session 17 has a secret-scanning step in the pipeline - to catch it when
-somebody does it by accident.
+This is why Session 17 has a secret scanning step.
 
 ### ConfigMap vs Secret
-
-Almost the same object. Differences:
 
 | | ConfigMap | Secret |
 |---|---|---|
 | values | plain text | base64 |
-| shown by `describe` | yes | no, sizes only |
-| in etcd | plain | plain unless encryption at rest is on |
-| volume mount | normal file | `tmpfs`, kept in memory |
-| size limit | 1MB | 1MB |
+| shown by describe | yes | no, sizes only |
+| in etcd | plain | plain unless encryption is on |
+| volume mount | normal file | tmpfs, kept in memory |
 
-The `tmpfs` bit is real - a mounted secret never touches the node's disk.
+The tmpfs part is real, a mounted secret never touches the node's disk.
 
 ## Task 3 - Ingress
 
-Two apps, two Services, one Ingress ([`ingress/`](ingress/)).
+Two apps, two Services, one Ingress.
 
 ```
-NAME           CLASS   HOSTS                  ADDRESS        PORTS   AGE
-demo-ingress   nginx   demo.local,two.local   192.168.49.2   80      11s
-```
-
-```bash
-kubectl describe ingress demo-ingress
+NAME           CLASS   HOSTS                  ADDRESS        PORTS
+demo-ingress   nginx   demo.local,two.local   192.168.49.2   80
 ```
 
 ```
 Rules:
   Host        Path  Backends
-  ----        ----  --------
   demo.local
               /one   app-one:80 (10.244.0.83:8080,10.244.0.84:8080)
               /two   app-two:80 (10.244.0.85:8080,10.244.0.86:8080)
@@ -220,11 +155,9 @@ Rules:
               /   app-two:80 (10.244.0.85:8080,10.244.0.86:8080)
 ```
 
-The backends list real pod IPs, which is how you know the Services are wired correctly.
+The backends show real pod IPs, which means the Services are wired up right.
 
-### Testing the routing
-
-`demo.local` isn't a real DNS name, so I sent the `Host` header by hand from inside the node:
+`demo.local` is not a real DNS name so I sent the Host header by hand:
 
 ```bash
 minikube ssh "curl -s -H 'Host: demo.local' http://localhost:32739/one"
@@ -232,86 +165,59 @@ minikube ssh "curl -s -H 'Host: demo.local' http://localhost:32739/one"
 
 | request | response |
 |---|---|
-| `Host: demo.local` `/one` | `this is APP ONE` |
-| `Host: demo.local` `/two` | `this is APP TWO` |
-| `Host: two.local` `/` | `this is APP TWO` |
-| `Host: nope.local` `/` | `404` |
+| `Host: demo.local` `/one` | this is APP ONE |
+| `Host: demo.local` `/two` | this is APP TWO |
+| `Host: two.local` `/` | this is APP TWO |
+| `Host: nope.local` `/` | 404 |
 
-Same IP, same port, different app - decided purely by Host header and path. The 404 on an unknown
-host proves the controller is matching rules rather than just forwarding everything.
+Same IP, same port, different app, decided by Host header and path. The 404 shows it is actually
+matching rules rather than forwarding everything.
 
-**Why this matters:** in Session 11, each LoadBalancer Service would be its own cloud load balancer
-with its own bill and its own IP. Here two apps share one entry point.
+In Session 11 each LoadBalancer Service would be its own cloud load balancer with its own bill.
+Here two apps share one entry point.
 
 ## Task 4 - Ingress vs Ingress Controller
 
-### What is Ingress?
+**Ingress** is an API object. A set of rules saying "host X path Y goes to service Z". That is all
+it is, just data. By itself it does nothing - create one in a cluster with no controller and it
+sits there with an empty ADDRESS forever.
 
-An API object. A set of routing rules - "host X path Y goes to service Z". That's all it is: data.
-
-By itself an Ingress **does nothing**. You can create one in a cluster with no controller and it
-will sit there with an empty ADDRESS forever.
-
-### What is an Ingress Controller?
-
-The program that reads those rules and actually serves traffic. It's a real pod running a real
-proxy - nginx, Traefik, HAProxy, Envoy.
-
-In my cluster, enabled with `minikube addons enable ingress`:
+**Ingress Controller** is the program that reads those rules and serves the traffic. It is a real
+pod running a real proxy like nginx or Traefik.
 
 ```
 $ kubectl get pods -n ingress-nginx
-NAME                                       READY   STATUS      RESTARTS   AGE
-ingress-nginx-controller-d7cd8c989-tx8qf   1/1     Running     0          35m
+NAME                                       READY   STATUS    AGE
+ingress-nginx-controller-d7cd8c989-tx8qf   1/1     Running   35m
 ```
 
-What it does in a loop:
+It loops: watch the apiserver for Ingress objects, turn them into an nginx config, reload, proxy
+the requests.
 
-1. watches the API server for Ingress objects
-2. converts the rules into an nginx config
-3. reloads nginx
-4. receives the actual HTTP requests and proxies them to pod IPs
-
-### The difference
-
-| | Ingress | Ingress Controller |
+| | Ingress | Controller |
 |---|---|---|
-| what | a YAML object, rules | a running pod, a proxy |
-| ships with Kubernetes? | yes, the API type | **no, you install one** |
-| how many | many, one per app/team | usually one per cluster |
-| handles traffic? | no | yes, all of it |
+| what | YAML rules | a running proxy pod |
+| ships with Kubernetes? | the API type, yes | **no, you install one** |
+| how many | many | usually one per cluster |
+| handles traffic | no | yes |
 
 Short version: **Ingress is the config file, the controller is the web server reading it.**
 
-### Why both are required
+Splitting them is deliberate. An app team writes the same YAML whether the platform runs nginx,
+Traefik or an AWS ALB. Swapping the controller does not change any app's manifests.
 
-Splitting them is deliberate. The Ingress object is a standard API, so an app team writes the same
-YAML whether the platform team runs nginx, Traefik or an AWS ALB. Swapping the controller doesn't
-change any app's manifests.
+That is also why `ingressClassName: nginx` exists. With more than one controller the class says
+which should pick it up. Forgetting it is a classic reason an Ingress quietly does nothing.
 
-That's also why `ingressClassName: nginx` exists - with more than one controller installed, the
-class says which one should pick up this Ingress. Forgetting it is a classic reason an Ingress
-quietly does nothing.
-
-### Examples
-
-Controllers: ingress-nginx (what I used), Traefik (default in k3s), HAProxy, AWS ALB Controller,
-GKE's built-in one.
-
-The common mistake: writing a perfect Ingress on a cluster with no controller installed, then
-wondering why ADDRESS stays empty. Nothing is reading it.
+The common mistake is writing a perfect Ingress on a cluster with no controller and wondering why
+ADDRESS stays empty. Nothing is reading it.
 
 ## Task 5 - Troubleshooting
 
-[`troubleshooting/01-broken.yml`](troubleshooting/01-broken.yml) has **three** bugs planted in it.
-I applied it without looking and debugged from the output.
+[`troubleshooting/01-broken.yml`](troubleshooting/01-broken.yml) has three bugs in it. I applied it
+without looking and debugged from the output.
 
-### 1. Identify the problem
-
-```bash
-kubectl apply -f troubleshooting/01-broken.yml
-kubectl get pods -l app=broken-app
-```
+### Find the problem
 
 ```
 NAME                          READY   STATUS                       RESTARTS   AGE
@@ -319,53 +225,38 @@ broken-app-5f48f7cf55-567rj   0/1     CreateContainerConfigError   0          26
 broken-app-5f48f7cf55-5xcmc   0/1     CreateContainerConfigError   0          25s
 ```
 
-Not a crash, not an image problem - something about the container *config*.
+Not a crash, not an image problem. Something about the config.
 
-### 2. Run troubleshooting commands
-
-`kubectl logs` was useless here - the container never started, so there are no logs. `describe` had
-the answer in the Events:
-
-```bash
-kubectl describe pod -l app=broken-app
-```
+`kubectl logs` was useless, the container never started. `describe` had it:
 
 ```
-State:          Waiting
-  Reason:       CreateContainerConfigError
-...
-Warning  Failed  10s (x3 over 25s)  kubelet
+Warning  Failed  kubelet
   Error: couldn't find key DOES_NOT_EXIST in ConfigMap default/app-config
 ```
 
-**Root cause 1:** the pod referenced a ConfigMap key that doesn't exist.
+**Bug 1:** referenced a ConfigMap key that does not exist.
 
 Then the Service:
 
-```bash
-kubectl get endpoints broken-svc
 ```
-```
+$ kubectl get endpoints broken-svc
 NAME         ENDPOINTS   AGE
 broken-svc   <none>      25s
 ```
 
-Empty. Compared the selector with the actual labels:
+Empty. Compared the selector with the labels:
 
 ```
 svc selector: {"app":"brokenapp"}
 pod labels  : {"app":"broken-app","pod-template-hash":"5f48f7cf55"}
 ```
 
-**Root cause 2:** `brokenapp` vs `broken-app` - a missing dash. Labels are exact strings, so it
-matched nothing.
+**Bug 2:** `brokenapp` vs `broken-app`, a missing dash. Labels are exact strings.
 
-**Root cause 3:** reading the YAML, `targetPort: 9999` but the container listens on 8080. This one
-produces no error at all - endpoints would populate and connections would just hang.
+**Bug 3:** reading the YAML, `targetPort: 9999` but the container listens on 8080. This one gives
+no error at all, endpoints would fill and connections would just hang.
 
-### 3. Fix it
-
-[`troubleshooting/02-fixed.yml`](troubleshooting/02-fixed.yml):
+### Fix
 
 | bug | before | after |
 |---|---|---|
@@ -373,48 +264,31 @@ produces no error at all - endpoints would populate and connections would just h
 | 2 | `app: brokenapp` | `app: broken-app` |
 | 3 | `targetPort: 9999` | `targetPort: 8080` |
 
-### 4. Before / after
+### After
 
-**Before:**
-```
-NAME                          READY   STATUS                       RESTARTS   AGE
-broken-app-5f48f7cf55-567rj   0/1     CreateContainerConfigError   0          26s
-broken-app-5f48f7cf55-5xcmc   0/1     CreateContainerConfigError   0          25s
-
-NAME         ENDPOINTS   AGE
-broken-svc   <none>      25s
-```
-
-**After:**
 ```
 $ kubectl apply -f troubleshooting/02-fixed.yml
-deployment.apps/broken-app configured
-service/broken-svc configured
 deployment "broken-app" successfully rolled out
 
-NAME                          READY   STATUS        RESTARTS   AGE
-broken-app-5f48f7cf55-5xcmc   0/1     Terminating   0          34s
-broken-app-cb9c94f9f-8csn6    1/1     Running       0          1s
-broken-app-cb9c94f9f-fm29q    1/1     Running       0          2s
+NAME                          READY   STATUS    AGE
+broken-app-cb9c94f9f-8csn6    1/1     Running   1s
+broken-app-cb9c94f9f-fm29q    1/1     Running   2s
 
 NAME         ENDPOINTS                           AGE
 broken-svc   10.244.0.89:8080,10.244.0.90:8080   34s
 ```
-
-And actually serving:
 
 ```
 $ kubectl run tester --image=busybox:1.36 --rm -i --restart=Never -- wget -qO- http://broken-svc/
 broken app works now
 ```
 
-### What I took away
+### Notes
 
-- `CreateContainerConfigError` always means a missing ConfigMap/Secret reference. It's distinct from
-  `CrashLoopBackOff` (app started and died) and `ImagePullBackOff` (couldn't get the image).
-- `kubectl logs` gives nothing when the container never started. `describe` and its Events do.
-- **Empty endpoints = selector doesn't match labels.** First thing to check on any "service not
-  working" report.
-- The port bug is the nastiest of the three because nothing reports an error - you only find it by
-  comparing the Service to what the container actually listens on. Same class of mistake as the
-  headless-service port issue in Session 11.
+- `CreateContainerConfigError` always means a missing ConfigMap or Secret reference. Different from
+  CrashLoopBackOff (app started and died) and ImagePullBackOff (could not get the image).
+- `kubectl logs` gives nothing when the container never started. Use describe.
+- **Empty endpoints means the selector does not match the labels.** First thing to check on any
+  "service not working".
+- The port bug is the worst of the three because nothing reports an error. You only find it by
+  comparing the Service to what the container actually listens on.

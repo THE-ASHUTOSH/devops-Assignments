@@ -1,81 +1,81 @@
 # S3 - Storage
 
-## What is S3?
+## What is S3
 
-Object storage. You put files in and get them back by key over HTTP. Not a filesystem - there's no
-"append" or "rename", you replace the whole object. Effectively unlimited, 11 nines of durability.
+Object storage. Put files in, get them back by key over HTTP. Not a filesystem - there is no append
+or rename, you replace the whole object. Effectively unlimited.
 
 ## Buckets
 
 The top-level container.
 
-- Bucket names are **globally unique across all AWS accounts**, which is why mine in the Terraform
-  demo is `ashutosh-24bcs10111-tf-demo`
+- Names are **globally unique across all AWS accounts**, which is why mine in the Terraform demo is
+  `ashutosh-24bcs10111-tf-demo`
 - A bucket lives in one region even though the name is global
-- Lowercase, no underscores (DNS-compatible)
+- Lowercase, no underscores
 - Private by default now, after too many public-bucket leaks
 
 ## Objects
 
-The files. Each has a **key** (the full name, e.g. `logs/2026/01/app.log`), the data (up to 5TB),
+The files. Each has a **key** (the full name like `logs/2026/01/app.log`), the data (up to 5TB),
 metadata, and a version id if versioning is on.
 
-There are **no real folders**. The console shows `logs/` as a folder but it's just a key prefix,
+There are **no real folders**. The console shows `logs/` as a folder but it is just a key prefix,
 which is why listing is a prefix search.
 
 ## Storage classes
 
 | class | for |
 |---|---|
-| Standard | frequently accessed, the default |
-| Intelligent-Tiering | unknown access patterns, auto-moves |
-| Standard-IA | infrequent but needs instant access |
+| Standard | frequently accessed, default |
+| Intelligent-Tiering | unknown access, auto-moves |
+| Standard-IA | infrequent but instant |
 | One Zone-IA | same, one AZ, cheaper |
-| Glacier Instant Retrieval | archive, instant |
-| Glacier Flexible Retrieval | archive, minutes to hours |
-| Glacier Deep Archive | cheapest, up to 12h retrieval |
+| Glacier Instant | archive, instant |
+| Glacier Flexible | archive, minutes to hours |
+| Glacier Deep Archive | cheapest, up to 12h |
 
 Catch: IA and Glacier have **minimum storage durations** (30/90/180 days). Delete early and you
-still pay for the full period, so moving small short-lived files there can cost more.
+still pay the full period, so small short-lived files can cost more there.
 
 ## Versioning
 
-Keeps every version instead of overwriting. Once enabled it can only be suspended, never fully
-turned off.
+Keeps every version instead of overwriting. Once on it can only be suspended, never fully turned
+off.
 
-A delete with versioning on doesn't really delete - it adds a **delete marker**. Old versions are
-still there and still billed, you just don't see them. That's the accidental-deletion protection
-and also the thing that quietly grows your bill.
+A delete with versioning on does not really delete, it adds a **delete marker**. Old versions are
+still there and still billed, you just do not see them. That is the protection and also the thing
+that quietly grows your bill.
 
-I turned this on in the Terraform demo with `aws_s3_bucket_versioning`.
+I turned this on in the Terraform demo.
 
 ## Lifecycle policies
 
 Rules that move or delete objects by age:
 
 ```
-logs/ → 30 days → Standard-IA
-      → 90 days → Glacier
-      → 365 days → delete
+logs/ -> 30 days -> Standard-IA
+      -> 90 days -> Glacier
+      -> 365 days -> delete
 ```
 
-With versioning on you usually also add a rule to expire **noncurrent** versions, otherwise they
-accumulate forever.
+With versioning on you usually also expire **noncurrent** versions, otherwise they pile up forever.
 
 ## Encryption
 
-**At rest:**
-- SSE-S3 (AES256) - AWS manages the key, on by default. What I used in Terraform.
-- SSE-KMS - a KMS key, so you get an audit trail and control over who decrypts
-- SSE-C - you supply the key on every request
+At rest:
+
+- SSE-S3 (AES256) - AWS manages the key, on by default, what I used
+- SSE-KMS - a KMS key, so you get an audit trail
+- SSE-C - you supply the key each request
 - client-side - you encrypt before uploading
 
-**In transit:** HTTPS, and you can force it with a bucket policy denying `aws:SecureTransport=false`.
+In transit: HTTPS, and you can force it with a bucket policy denying `aws:SecureTransport=false`.
 
 ## Bucket policies
 
-Resource-based JSON attached to the **bucket** rather than an identity, so they can grant access to
-other accounts or anonymous users:
+JSON attached to the **bucket** instead of an identity, so it can grant access to other accounts or
+anonymous users:
 
 ```json
 {
@@ -86,16 +86,16 @@ other accounts or anonymous users:
 }
 ```
 
-That makes a bucket publicly readable - fine for a static site, a disaster for anything else.
+That makes a bucket publicly readable - fine for a static site, a disaster otherwise.
 
-**Block Public Access** is a separate switch that overrides policies like this. On by default, and I
-kept it on in the Terraform demo.
+**Block Public Access** is a separate switch that overrides policies like this. On by default and I
+kept it on.
 
 ## Common use cases
 
 - Static website hosting, usually behind CloudFront
 - Backups and archives
-- Data lake - raw data queried by Athena
+- Data lake queried by Athena
 - Application file uploads
-- Terraform remote state backend, with DynamoDB for locking
-- Log destination for CloudTrail, ALB, VPC flow logs
+- Terraform remote state, with DynamoDB for locking
+- Log destination for CloudTrail and ALB

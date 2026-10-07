@@ -1,26 +1,26 @@
 # IAM - Governance
 
-## What is IAM?
+## What is IAM
 
-IAM decides **who can do what** in AWS. Every API call gets checked against it. It's free and
-global, not per-region.
+IAM decides **who can do what** in AWS. Every API call gets checked against it. Free, and global
+rather than per-region.
 
-Two questions it answers: who are you (authentication), and are you allowed (authorization).
+Two questions: who are you (authentication), and are you allowed (authorization).
 
 ## Users
 
-One identity, usually one person or one application. Has either a console password or an access key
-id + secret key for the CLI.
+One identity, usually one person or one app. Has a console password or an access key id + secret
+key for the CLI.
 
-The **root user** is the email you signed up with and can do everything, including close the
-account. You're meant to put MFA on it and then never use it.
+The **root user** is the email you signed up with and can do everything including close the
+account. Put MFA on it and then never use it.
 
 ## Groups
 
-A collection of users. Attach policies to the group and every user in it inherits them.
+A collection of users. Attach policies to the group and everyone in it inherits them.
 
 The point is managing permissions in one place - new developer joins, add them to `Developers`,
-done. A group isn't an identity, so you can't give it credentials.
+done. A group is not an identity so you cannot give it credentials.
 
 ## Roles
 
@@ -33,13 +33,13 @@ that expire.
 | who uses it | one person/app | anything allowed to assume it |
 
 Used for an EC2 instance that needs S3 (attach a role, no keys on the box), a Lambda function,
-cross-account access, or letting a Google login map to AWS permissions.
+cross-account access, or mapping a Google login to AWS permissions.
 
 Roles are the right answer almost any time you were about to hardcode an access key.
 
 ## Policies
 
-JSON documents listing permissions:
+JSON listing the permissions:
 
 ```json
 {
@@ -54,41 +54,38 @@ JSON documents listing permissions:
 }
 ```
 
-Four parts: **Effect** (Allow/Deny), **Action** (which API calls), **Resource** (which ARNs), and
-optionally **Condition**.
+Four parts - Effect (Allow/Deny), Action (which API calls), Resource (which ARNs), optionally
+Condition.
 
-Types: AWS managed (written by AWS, easy but usually too broad), customer managed (yours, reusable),
-and inline (embedded in one identity, dies with it).
+Types: AWS managed (written by AWS, easy but usually too broad), customer managed (yours), and
+inline (stuck to one identity).
 
 ## Permissions
 
-How a request is decided:
-
 1. Default is **deny**
-2. An explicit `Allow` anywhere turns it on
-3. An explicit `Deny` anywhere beats everything
+2. An explicit Allow turns it on
+3. An explicit Deny beats everything
 
-Deny always wins. That's how you carve an exception out of a broad permission.
+Deny always wins. That is how you carve an exception out of a broad permission.
 
 ## Least privilege
 
-Give only what's actually needed. `"Action": "*"` on `"Resource": "*"` is the thing to avoid - if
-those keys leak the account is gone.
+Only what is actually needed. `"Action": "*"` on `"Resource": "*"` is the thing to avoid - if those
+keys leak the account is gone.
 
-Practical approach: start with nothing, let it break, add exactly the action named in the error.
+Practical way: start with nothing, let it break, add exactly the action named in the error.
 
 ## Best practices
 
 - MFA on root, then lock root away
 - Roles for applications, never access keys on a server
-- Groups for humans, not per-user policies
-- Rotate access keys, delete unused ones
-- Never commit access keys to git (this is why Session 17 has a secret-scanning job)
-- Use the Credential Report / Access Analyzer to find over-permissioned identities
+- Groups for humans
+- Rotate keys, delete unused ones
+- Never commit access keys to git (this is why Session 17 has secret scanning)
 
 ## Common use cases
 
 - EC2 instance role so an app reaches S3 with no credentials on disk
-- A role assumed by GitHub Actions via OIDC, so there are no AWS keys stored in the repo
+- A role assumed by GitHub Actions via OIDC, so no AWS keys in the repo
 - Read-only role for an auditor
-- Cross-account role for a central identity account
+- Cross-account role

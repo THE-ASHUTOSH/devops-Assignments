@@ -1,6 +1,6 @@
 # Session 18 - Terraform & Infrastructure as Code
 
-**Ashutosh Kumar** · **24bcs10111**
+Ashutosh Kumar - 24bcs10111
 
 Terraform v1.16.5, AWS provider v5.100.0, Windows 11.
 
@@ -16,15 +16,14 @@ outputs.tf        what to print after apply
 terraform.tfvars  actual values
 ```
 
-I kept them as separate files instead of one big `main.tf` because that's the normal layout and
-it's easier to find things.
+Separate files instead of one big main.tf, because that is the normal layout and it is easier to
+find things.
 
-### Commands I ran
+### Commands
 
 `terraform init` - downloads the provider:
 
 ```
-Initializing provider plugins...
 - Finding hashicorp/aws versions matching "~> 5.0"...
 - Installing hashicorp/aws v5.100.0...
 - Installed hashicorp/aws v5.100.0 (signed by HashiCorp)
@@ -32,7 +31,7 @@ Initializing provider plugins...
 Terraform has been successfully initialized!
 ```
 
-`terraform fmt -check -recursive` - printed nothing and exit code 0, so formatting was already fine.
+`terraform fmt -check -recursive` - printed nothing, exit code 0, so formatting was already fine.
 
 `terraform validate`:
 
@@ -40,53 +39,48 @@ Terraform has been successfully initialized!
 Success! The configuration is valid.
 ```
 
-`terraform plan` - this is the first one that actually talks to AWS, and I don't have an account
+`terraform plan` - this is the first one that actually talks to AWS, and I do not have an account
 set up, so it failed:
 
 ```
 Planning failed. Terraform encountered an error while generating this plan.
 
 │ Error: No valid credential sources found
-│
 │   with provider["registry.terraform.io/hashicorp/aws"],
 │   on provider.tf line 12, in provider "aws":
-│   12: provider "aws" {
 │
 │ Error: failed to refresh cached credentials, no EC2 IMDS role found,
-│ operation error ec2imds: GetMetadata, exceeded maximum number of attempts,
-│ 3, request send failed, Get
-│ "http://169.254.169.254/latest/meta-data/iam/security-credentials/": dial
-│ tcp 169.254.169.254:80
+│ Get "http://169.254.169.254/latest/meta-data/iam/security-credentials/":
+│ dial tcp 169.254.169.254:80
 ```
 
-Leaving the real error instead of pasting a fake plan. It's actually useful - you can see it
-looking for credentials in order: env vars, then `~/.aws/credentials`, then the EC2 metadata
-address `169.254.169.254` (which only works if you're running on an EC2 machine), then giving up.
+Leaving the real error instead of pasting a fake plan. It is actually useful, you can see it look
+for credentials in order - env vars, then ~/.aws/credentials, then the EC2 metadata address (which
+only works if you are on an EC2 machine), then give up.
 
-So `init`, `fmt` and `validate` above are real output. The rest need credentials:
+So init, fmt and validate above are real output. The rest need credentials:
 
-- `terraform apply` - shows the plan, asks you to type `yes`, then creates. It would say
-  `Plan: 4 to add` - the bucket plus versioning, encryption and public access block, which are
-  separate resources in provider v5.
-- `terraform show` - prints the current state.
-- `terraform output` - prints just the outputs, like `terraform output bucket_arn`.
-- `terraform destroy` - deletes it all, also asks for `yes`.
+- `terraform apply` - shows the plan, you type `yes`, it creates. Would say `Plan: 4 to add` - the
+  bucket plus versioning, encryption and public access block, which are separate resources in
+  provider v5.
+- `terraform show` - prints the current state
+- `terraform output` - just the outputs
+- `terraform destroy` - deletes it all, also asks for `yes`
 
 ### What I understood
 
-The main idea is the **state file**. Terraform writes `terraform.tfstate` with everything it
-created. Next time it compares config vs state vs real AWS and only changes the difference. That's
-what makes it declarative - I describe what I want, not the steps.
+The main idea is the **state file**. Terraform writes terraform.tfstate with everything it created.
+Next time it compares config vs state vs real AWS and only changes the difference. That is what
+makes it declarative - I describe what I want, not the steps.
 
-So the state file is important. I put it in `.gitignore` because it can hold secrets, and on a real
-team it goes in a shared S3 backend so two people don't apply at the same time.
+So the state file matters. It is in .gitignore because it can hold secrets, and on a team it goes
+in a shared S3 backend so two people do not apply at once.
 
 Other things I picked up:
 
 - Resources point at each other with `aws_s3_bucket.demo.id`. That reference is how Terraform works
-  out the order - I never wrote "do this first" anywhere.
-- `plan` being separate from `apply` is the safety net. You read the `+` and `-` lines before
-  anything happens.
+  out the order, I never wrote "do this first" anywhere.
+- `plan` being separate from `apply` is the safety net, you read the + and - lines first.
 - Bucket names are unique across all of AWS, so mine has my enrollment number in it.
 
 ## Task 2 - AWS services

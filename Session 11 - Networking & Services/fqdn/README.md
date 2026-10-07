@@ -1,17 +1,14 @@
-# FQDN in Kubernetes
+# FQDN
 
-## What is FQDN?
+## What is FQDN
 
-Fully Qualified Domain Name - the complete name of a host, all the way up to the root, with nothing
-left to guess.
+The full name of a host with nothing left to guess. `web-clusterip` is a short name,
+`web-clusterip.default.svc.cluster.local` is the FQDN. The short one only works if the resolver
+knows what to add.
 
-`web-clusterip` is a short name. `web-clusterip.default.svc.cluster.local` is the FQDN. The short
-one only works if the resolver knows what to append; the FQDN works from anywhere.
+## Service DNS
 
-## Kubernetes Service DNS
-
-Every Service automatically gets a DNS record. I didn't configure anything - I created the Service
-and it was resolvable:
+Every Service gets a DNS record automatically. I did not configure anything:
 
 ```
 $ kubectl exec netshoot -- nslookup web-clusterip.default.svc.cluster.local
@@ -19,39 +16,34 @@ Name:	web-clusterip.default.svc.cluster.local
 Address: 10.104.92.31
 ```
 
-This is why you never hardcode a pod IP. The Service name is stable, the pod IPs are not.
+This is why you never hardcode a pod IP. The service name stays, the pod IPs do not.
 
 ## Naming convention
 
 ```
-<service-name>.<namespace>.svc.cluster.local
+<service>.<namespace>.svc.cluster.local
 ```
 
-Reading it right to left:
+Reading it backwards:
 
 | part | what it is |
 |---|---|
-| `cluster.local` | the cluster domain (configurable, this is the default) |
-| `svc` | says this is a Service record |
-| `default` | the namespace the Service is in |
-| `web-clusterip` | the Service name |
+| cluster.local | the cluster domain |
+| svc | says this is a Service |
+| default | the namespace |
+| web-clusterip | the service name |
 
-For pods it's `<pod-ip-with-dashes>.<namespace>.pod.cluster.local`, e.g.
-`10-244-0-76.default.pod.cluster.local`. Rarely used directly.
-
-For a StatefulSet pod behind a headless Service you get a per-pod name:
+For a StatefulSet pod behind a headless Service you also get a per-pod name:
 
 ```
-<pod-name>.<service-name>.<namespace>.svc.cluster.local
 db-0.web-headless.default.svc.cluster.local
 ```
 
-That's the stable identity a StatefulSet promises.
+That is the stable identity a StatefulSet gives you.
 
-## Namespace-based DNS
+## Namespace DNS
 
-The short name only resolves inside the same namespace. This is because of the search list in every
-pod's `/etc/resolv.conf`:
+The short name only works inside the same namespace, because of the search list in every pod:
 
 ```
 $ kubectl exec netshoot -- cat /etc/resolv.conf
@@ -62,47 +54,34 @@ options ndots:5
 
 So from a pod in `default`:
 
-| you type | resolver tries | works? |
-|---|---|---|
-| `web-clusterip` | `web-clusterip.default.svc.cluster.local` | yes |
-| `web-clusterip.default` | `web-clusterip.default.svc.cluster.local` | yes |
-| `web-clusterip.default.svc.cluster.local` | exactly that | yes |
+| you type | works? |
+|---|---|
+| `web-clusterip` | yes |
+| `web-clusterip.default` | yes |
+| full FQDN | yes |
 
-From a pod in a *different* namespace, the short name fails - the first search entry would be
-`<other-ns>.svc.cluster.local`. You need at least `<service>.<namespace>`.
+From a different namespace the short name fails, you need at least `<service>.<namespace>`.
 
-Two details in that resolv.conf worth knowing:
+Two things in that file:
 
-- `nameserver 10.96.0.10` is the `kube-dns` Service ClusterIP. Confirmed:
+- `nameserver 10.96.0.10` is the kube-dns Service IP.
+- `options ndots:5` means any name with fewer than 5 dots tries the search list first. So
+  `google.com` gets tried as `google.com.default.svc.cluster.local` and two others before the real
+  one. Four failed lookups before every external call, which is a known cause of slow DNS. Fix is a
+  trailing dot (`google.com.`) or setting dnsConfig on the pod.
 
-  ```
-  $ kubectl get svc -n kube-system kube-dns
-  NAME       TYPE        CLUSTER-IP   PORT(S)
-  kube-dns   ClusterIP   10.96.0.10   53/UDP,53/TCP,9153/TCP
-  ```
+## Pod to Service
 
-- `options ndots:5` means any name with fewer than 5 dots gets the search list tried **first**.
-  `google.com` has 1 dot, so the resolver first tries `google.com.default.svc.cluster.local`,
-  `google.com.svc.cluster.local`, `google.com.cluster.local`, and only then `google.com`. Four
-  failed lookups before every external call. It's a well-known source of DNS slowness, and the fix
-  is a trailing dot (`google.com.`) or lowering ndots per-pod via `dnsConfig`.
+What happens when one pod calls another by name:
 
-## Pod-to-Service communication
+1. app connects to `http://web-clusterip/`
+2. resolver adds the search domains, asks CoreDNS at 10.96.0.10
+3. CoreDNS replies with the ClusterIP
+4. app opens a connection to it
+5. kube-proxy rewrites the destination to a real pod IP
 
-What actually happens when one pod calls another by name:
-
-1. App connects to `http://web-clusterip/`.
-2. Resolver appends the search domains, asks CoreDNS at `10.96.0.10`.
-3. CoreDNS answers with the Service ClusterIP, `10.104.92.31`.
-4. App opens a TCP connection to that IP.
-5. kube-proxy's iptables rules rewrite the destination to one real pod IP.
-6. Packet reaches the pod.
-
-Steps 1-3 are DNS, 4-6 are kube-proxy. Two separate mechanisms, which is why a service can fail in
-two different ways - name doesn't resolve (DNS problem) vs resolves but connection refused
-(endpoints/selector problem).
-
-Verified it end to end:
+Steps 1-3 are DNS, 4-5 are kube-proxy. Two separate things, which is why a service can fail two
+ways - name does not resolve (DNS) or resolves but connection refused (endpoints/selector).
 
 ```
 $ kubectl exec netshoot -- wget -qO- http://web-clusterip/
@@ -112,27 +91,22 @@ hello from web
 ## Examples
 
 ```
-web-clusterip.default.svc.cluster.local           ClusterIP service in default
-kube-dns.kube-system.svc.cluster.local            CoreDNS itself
-external-db.default.svc.cluster.local             ExternalName, returns a CNAME
-db-0.web-headless.default.svc.cluster.local       one specific StatefulSet pod
-10-244-0-76.default.pod.cluster.local             a pod by IP
+web-clusterip.default.svc.cluster.local      ClusterIP service
+kube-dns.kube-system.svc.cluster.local       CoreDNS itself
+external-db.default.svc.cluster.local        ExternalName, gives a CNAME
+db-0.web-headless.default.svc.cluster.local  one StatefulSet pod
 ```
 
-The ExternalName one is a nice example of the FQDN resolving to something outside the cluster
-entirely:
+ExternalName resolving to something outside the cluster:
 
 ```
-$ kubectl exec netshoot -- nslookup external-db.default.svc.cluster.local
 external-db.default.svc.cluster.local	canonical name = example.com
-Name:	example.com
 Address: 172.66.147.243
 ```
 
-And a headless FQDN returning several addresses instead of one:
+Headless giving several addresses instead of one:
 
 ```
-$ kubectl exec netshoot -- nslookup web-headless.default.svc.cluster.local
 Address: 10.244.0.78
 Address: 10.244.0.76
 Address: 10.244.0.77
