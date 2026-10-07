@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  APP_DIR: Session 16 - CI-CD & GitHub Actions/app
+
+jobs:
+  # JOB 1 - build and test the app
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: ${{ env.APP_DIR }}
+        run: npm install
+
+      - name: Run unit tests
+        working-directory: ${{ env.APP_DIR }}
+        run: npm test
+
+      - name: Save test output as an artifact
+        working-directory: ${{ env.APP_DIR }}
+        run: npm test > test-results.txt 2>&1 || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ${{ env.APP_DIR }}/test-results.txt
+
+  # JOB 2 - only runs if job 1 passed
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build the image
+        working-directory: ${{ env.APP_DIR }}
+        run: docker build -t cicd-demo:${{ github.sha }} .
+
+      - name: Smoke test the image
+        run: |
+          docker run -d --name demo -p 3000:3000 cicd-demo:${{ github.sha }}
+          sleep 5
+          curl -f http://localhost:3000/health
+          docker rm -f demo
