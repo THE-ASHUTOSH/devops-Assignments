@@ -1,0 +1,81 @@
+# Mini project: one app that uses everything from this session together -
+# a PVC for storage, all three probes, resource requests, and an HPA.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: notes-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 50Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: notes }
+  template:
+    metadata:
+      labels: { app: notes }
+    spec:
+      initContainers:
+        # seed the page onto the volume before nginx starts
+        - name: seed
+          image: busybox:1.36
+          command: ["sh", "-c", "echo '<h1>Notes app</h1><p>stored on a PVC</p>' > /data/index.html"]
+          volumeMounts:
+            - { name: notes-data, mountPath: /data }
+      containers:
+        - name: web
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - { name: notes-data, mountPath: /usr/share/nginx/html }
+          resources:
+            requests: { cpu: 100m, memory: 32Mi }
+            limits:   { cpu: 300m, memory: 128Mi }
+          startupProbe:        # give it time to boot before liveness starts
+            httpGet: { path: /, port: 80 }
+            failureThreshold: 10
+            periodSeconds: 3
+          readinessProbe:      # out of the Service until it can serve
+            httpGet: { path: /, port: 80 }
+            periodSeconds: 5
+          livenessProbe:       # restart if it stops responding
+            httpGet: { path: /, port: 80 }
+            periodSeconds: 10
+      volumes:
+        - name: notes-data
+          persistentVolumeClaim:
+            claimName: notes-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes
+spec:
+  selector: { app: notes }
+  ports:
+    - port: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: notes
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: notes
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 60 }
