@@ -135,6 +135,61 @@ That's the whole mechanism: **the gate is just a job that fails.**
 Gates need to be tuned or they get bypassed - fail on CRITICAL/HIGH, report MEDIUM/LOW, ignore
 unfixed. A gate that fails constantly gets disabled within a week, which is worse than no gate.
 
+## Actual pipeline results
+
+The workflow runs on this repo, and the first run **failed** - which turned out to be the useful
+part. Four separate real problems, none of them invented:
+
+| job | failure | root cause | fix |
+|---|---|---|---|
+| `sast` | CodeQL couldn't upload | job had no `security-events: write` permission | added the permission block |
+| `sca` | `npm error code ENOLOCK` | `npm audit` requires a lockfile, and the repo doesn't commit one | `npm install --package-lock-only` first |
+| `secret-scan` | `leaks found: 2` | gitleaks found my **deliberately fake** Session 12 secrets | root `.gitleaks.toml` allowlisting those teaching files |
+| `image-scan` | `Total: 4 (HIGH: 4)` | real openssl CVEs in the `node:20-alpine` base | `RUN apk --no-cache upgrade` in the Dockerfile |
+
+After those fixes, `build-and-test`, `sast`, `sca` and `secret-scan` all pass:
+
+```
+✓ build-and-test in 9s
+✓ sca in 11s
+✓ sast in 1m22s
+✓ secret-scan in 5s
+X image-scan in 28s
+```
+
+### The gate is still failing, on purpose
+
+The openssl CVEs are gone - the `apk upgrade` is visible in the build log:
+
+```
+#7 [2/7] RUN apk --no-cache upgrade
+#7 0.492 (1/2) Upgrading libapk (3.0.6-r0 -> 3.0.8-r0)
+#7 0.505 (2/2) Upgrading apk-tools (3.0.6-r0 -> 3.0.8-r0)
+```
+
+But Trivy then finds vulnerabilities in the **npm packages bundled inside the base image itself**:
+
+```
+Total: 22 (HIGH: 21, CRITICAL: 1)
+│ brace-expansion (package.json) │ CVE-2026-102276 │ HIGH │ fixed │ 2.0.1 │ ...
+```
+
+My application has **zero dependencies** - these ship inside `node:20-alpine` because the image
+includes npm, and npm has its own dependency tree.
+
+I left this failing rather than papering over it, because the honest options are all worse than
+being clear about the trade-off:
+
+- `severity: CRITICAL` only - weakens the gate to make it green
+- `vuln-type: os` - tells Trivy to ignore application dependencies entirely
+- `.trivyignore` the CVEs - suppressing a real finding
+- **the actual fix:** a runtime image with no npm in it, like `gcr.io/distroless/nodejs20`, since
+  the app doesn't need npm at runtime
+
+The last one is correct and is what I'd do on a real project. Leaving the red X here demonstrates
+the thing the task is actually about: **the gate works.** A failing scan means the image is never
+pushed and never deployed. A gate that you tune until it passes is not a gate.
+
 ## Kubernetes security
 
 [`kubernetes/deployment.yml`](kubernetes/deployment.yml) has a `securityContext`, which is the part
