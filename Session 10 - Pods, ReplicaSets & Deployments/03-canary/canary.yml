@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-canary
+spec:
+  replicas: 1              # 1 of 5 pods = ~20% of traffic
+  selector:
+    matchLabels:
+      app: shop
+      track: canary
+  template:
+    metadata:
+      labels:
+        app: shop
+        track: canary
+    spec:
+      containers:
+        - name: app
+          image: hashicorp/http-echo:1.0
+          args: ["-text=CANARY v2", "-listen=:8080"]
+          ports:
+            - containerPort: 8080

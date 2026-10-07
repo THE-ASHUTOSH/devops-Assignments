@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp
+spec:
+  selector:
+    app: myapp
+    version: blue      # switch this to green to move all traffic
+  ports:
+    - port: 80
+      targetPort: 8080

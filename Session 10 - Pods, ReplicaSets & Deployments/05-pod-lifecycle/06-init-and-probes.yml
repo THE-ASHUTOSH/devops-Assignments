@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lc-init-probes
+spec:
+  initContainers:
+    - name: wait-a-bit
+      image: busybox:1.36
+      command: ["sh", "-c", "echo init container running; sleep 10; echo init done"]
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+      lifecycle:
+        postStart:
+          exec:
+            command: ["sh", "-c", "echo postStart hook ran > /usr/share/nginx/html/hook.txt"]
+        preStop:
+          exec:
+            command: ["sh", "-c", "echo stopping; sleep 2"]
+      readinessProbe:       # when is it ready for traffic
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 2
+        periodSeconds: 3
+      livenessProbe:        # is it still alive, restart if not
+        httpGet:
+          path: /
+          port: 80
+        initialDelaySeconds: 5
+        periodSeconds: 5

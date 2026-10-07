@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-stable
+spec:
+  replicas: 4              # 4 of 5 pods = ~80% of traffic
+  selector:
+    matchLabels:
+      app: shop
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: shop
+        track: stable
+    spec:
+      containers:
+        - name: app
+          image: hashicorp/http-echo:1.0
+          args: ["-text=STABLE v1", "-listen=:8080"]
+          ports:
+            - containerPort: 8080

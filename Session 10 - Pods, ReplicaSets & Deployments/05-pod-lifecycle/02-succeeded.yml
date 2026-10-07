@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lc-succeeded
+spec:
+  restartPolicy: Never      # without this it would restart forever
+  containers:
+    - name: job
+      image: busybox:1.36
+      command: ["sh", "-c", "echo doing some work; sleep 5; echo done"]
