@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Coursework files containing deliberately fake secrets"
+paths = [
+  '''Session 12 - Ingress, ConfigMaps & Secrets/secret/secret.yml''',
+  '''final-devops-project/kubernetes/secret.yml''',
+]

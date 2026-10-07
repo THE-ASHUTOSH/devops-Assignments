@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: visitor-config
+data:
+  APP_NAME: "visitor-app"
+  LOG_LEVEL: "info"

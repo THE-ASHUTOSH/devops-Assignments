@@ -1,0 +1,60 @@
+# Reference copy. GitHub only executes workflows from the REPO ROOT .github/workflows/,
+# so the ones that actually run are ../../.github/workflows/{ci,devsecops}.yml
+name: Final Project Pipeline
+
+on:
+  workflow_dispatch:
+
+env:
+  APP: final-devops-project
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm install
+        working-directory: ${{ env.APP }}/application
+      - run: npm test
+        working-directory: ${{ env.APP }}/application
+
+  security:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: SCA
+        run: npm audit --audit-level=high
+        working-directory: ${{ env.APP }}/application
+
+  image:
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f ${{ env.APP }}/docker/Dockerfile -t visitor-app:${{ github.sha }} ${{ env.APP }}
+      - name: Trivy scan (security gate)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: visitor-app:${{ github.sha }}
+          exit-code: '1'
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: image
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy (GitOps takes over from here)
+        run: |
+          echo "Image passed all gates."
+          echo "Argo CD reconciles ${{ env.APP }}/kubernetes from main."

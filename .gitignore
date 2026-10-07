@@ -2,3 +2,9 @@ node_modules/
 dist/
 sysreport/
 .DS_Store
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+node_modules/

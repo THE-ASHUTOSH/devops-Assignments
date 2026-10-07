@@ -1,0 +1,32 @@
+replicaCount: 2
+
+image:
+  repository: visitor-app
+  tag: local
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  host: visitor.local
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 60
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 300m
+    memory: 128Mi
+
+config:
+  APP_NAME: visitor-app
+  LOG_LEVEL: info

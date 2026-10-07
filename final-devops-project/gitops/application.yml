@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: visitor-app
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/THE-ASHUTOSH/devops-Assignments.git
+    targetRevision: main
+    path: final-devops-project/kubernetes
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: visitor
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
